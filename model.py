@@ -30,6 +30,9 @@ class MemN2N(object):
         self.mask = tf.placeholder(tf.float32, [self.batch_size, self.mem_size], name="mask")
         self.neg_inf = tf.fill([self.batch_size, self.mem_size], -1*np.inf, name="neg_inf")
 
+        self.delta_inv = tf.placeholder(tf.float32, [self.batch_size, self.mem_size, self.mem_size], name="delta_inv")
+        self.W_ma      = tf.placeholder(tf.float32, [self.batch_size, self.mem_size, 1], name="W_ma")
+
         self.show = config.show
 
         self.hid = []
@@ -54,38 +57,23 @@ class MemN2N(object):
       self.BL_W = tf.Variable(tf.random_uniform([2 * self.edim, 1], minval=-0.01, maxval=0.01))
       self.BL_B = tf.Variable(tf.random_uniform([1, 1], minval=-0.01, maxval=0.01))
 
+
       self.Ain_c = tf.nn.embedding_lookup(self.A, self.context)
       self.Ain = self.Ain_c
 
       self.ASPin = tf.nn.embedding_lookup(self.ASP, self.input)
       self.ASPout2dim = tf.reshape(self.ASPin, [-1, self.edim])
-      self.hid.append(self.ASPout2dim)
+      self.hid.append(self.ASPout2dim)    
 
+      lstm_in = self.Ain
+      lstm_dim = self.edim
 
+      self.Z  = tf.matmul(self.delta_inv, self.W_ma) #(batch_size * m * 1)
+      tf.reshape(self.Mi, [batch_size, -1])
 
-      self.Mi #(batch_size * m * lstm_dim
-      self.AdjMat #(batch_size * m * m)
-      self.DMat #(batch_size * m * m)
-      self.ADis #(batch_size * m * 1)   
+      self.Mm = tf.transpose(lstm_in, perm=[0, 2, 1])
 
-      self.Delta = tf.subtract(self.DMat, self.AdjMat)
-      self.IDelta = tf.matrix_inverse(self.Delta)
-
-      self.Z = tf.matmul(self.IDelta, self.ADis) #(batch_size * m * 1)
-      tf.reshape(self.Mi,[batch_size])
-
-      self.Mm = tf.transpose(self.Mi, perm=[self.batch_size,self.lstm_dim,self.mem_size])
-
-      self.Og = tf.matmul(self.Mm, self.Z)
-
-
-
-
-
-
-
-
-
+      self.Og = tf.matmul(self.Mm, self.Z)   #(batch_size * edim * 1)
 
       for h in xrange(self.nhop):
         '''
@@ -101,13 +89,17 @@ class MemN2N(object):
         self.til_bl_3dim = tf.reshape(self.til_bl_b, [-1, self.mem_size, 1])
         self.g = tf.nn.tanh(tf.add(self.att, self.til_bl_3dim))
         self.g_2dim = tf.reshape(self.g, [-1, self.mem_size])
-        self.masked_g_2dim = tf.add(self.g_2dim, self.mask)
-        self.P = tf.nn.softmax(self.masked_g_2dim)
+        #self.masked_g_2dim = tf.add(self.g_2dim, self.mask)
+        self.masked_g_2dim = tf.multiply(self.g_2dim, self.mask)
+        #self.P = tf.nn.softmax(self.masked_g_2dim)
+        self.P = self.masked_g_2dim
         self.probs3dim = tf.reshape(self.P, [-1, 1, self.mem_size])
 
 
         self.Aout = tf.matmul(self.probs3dim, self.Ain)
         self.Aout2dim = tf.reshape(self.Aout, [self.batch_size, self.edim])
+        
+        self.Aout2dim = tf.add(self.Aout2dim, self.Og)
 
         Cout = tf.matmul(self.hid[-1], self.C)
         til_C_B = tf.tile(self.C_B, [self.batch_size, 1])
@@ -173,7 +165,8 @@ class MemN2N(object):
         context.fill(self.pad_idx)
         time.fill(self.mem_size)
         target.fill(0)
-        mask.fill(-1.0*np.inf)
+        #mask.fill(-1.0*np.inf)
+        mask.fill(0)
         
 
         for b in xrange(self.batch_size):
@@ -182,7 +175,8 @@ class MemN2N(object):
             target[b] = target_label[m]
             time[b,:len(source_loc_data[m])] = source_loc_data[m]
             context[b,:len(source_data[m])] = source_data[m]
-            mask[b,:len(source_data[m])].fill(0)
+            #mask[b,:len(source_data[m])].fill(0)
+            mask[b,:len(source_data[m])].fill(1)
             cur = cur + 1
  
         z, a, loss, self.step = self.sess.run([ self.z, self.optim,
@@ -224,7 +218,8 @@ class MemN2N(object):
         target.fill(0)
         time.fill(self.mem_size)
         context.fill(self.pad_idx)
-        mask.fill(-1.0*np.inf)
+        #mask.fill(-1.0*np.inf)
+        mask.fill(0)
         
         raw_labels = []
         for b in xrange(self.batch_size):
@@ -232,7 +227,8 @@ class MemN2N(object):
           target[b] = target_label[m]
           time[b,:len(source_loc_data[m])] = source_loc_data[m]
           context[b,:len(source_data[m])] = source_data[m]
-          mask[b,:len(source_data[m])].fill(0)
+          #mask[b,:len(source_data[m])].fill(0)
+          mask[b,:len(source_data[m])].fill(1)
           raw_labels.append(target_label[m])
           m += 1
 
