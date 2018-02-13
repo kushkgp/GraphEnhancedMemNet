@@ -5,8 +5,9 @@ import numpy as np
 
 class Constree:
 	def __init__(self):
-		self.nlp = snlp(r'../resources/stanford-corenlp-full-2018-01-31')
+		self.nlp = snlp(r'./resources/stanford-corenlp-full-2018-01-31')
 	def parseSentence(self,sentence):
+		# print sentence
 		parsing = self.nlp.parse(sentence)
 		# print parsing
 		self.ptree = ParentedTree.fromstring(parsing)

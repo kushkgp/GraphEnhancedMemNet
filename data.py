@@ -211,57 +211,62 @@ def get_dataset(data_file_name, sent_word2idx, target_word2idx, embeddings):
 
       target_locations = range(target_location,target_location+len(target_words))
       original_sentence = sentence.replace("$t$", target)
-      original_sentence = re.sub(r'[^\w\s]','',original_sentence)
-      DI_mm, W_ma = Ctree.getReuiredParameters(sentence = original_sentence, aspect_words_indexes = target_locations)
+      try:
+        DI_mm, W_ma = Ctree.getReuiredParameters(sentence = original_sentence, aspect_words_indexes = target_locations)
+        #
+      except Exception as e:
+        print e
+        continue
 
-      # is_included_flag = 1
-      # id_tokenised_sentence = []
-      # location_tokenised_sentence = []
+      is_included_flag = 1
+      id_tokenised_sentence = []
+      location_tokenised_sentence = []
       
-      # for index, word in enumerate(sent_words):
-      #   if word == "$t$":
-      #     continue
-      #   try:
-      #     word_index = sent_word2idx[word]
-      #   except:
-      #     print "id not found for word in the sentence"
-      #     exit()
+      for index, word in enumerate(sent_words):
+        if word == "$t$":
+          continue
+        try:
+          word_index = sent_word2idx[word]
+        except:
+          print "id not found for word in the sentence"
+          exit()
 
-      #   location_info = abs(index - target_location)
+        location_info = abs(index - target_location)
 
-      #   if word in embeddings:
-      #     id_tokenised_sentence.append(word_index)
-      #     location_tokenised_sentence.append(location_info)
+        if word in embeddings:
+          id_tokenised_sentence.append(word_index)
+          location_tokenised_sentence.append(location_info)
 
-      #   # if word not in embeddings:
-      #   #   is_included_flag = 0
-      #   #   break
+        # if word not in embeddings:
+        #   is_included_flag = 0
+        #   break
 
-      # is_included_flag = 0
-      # for word in target_words:
-      #   if word in embeddings:
-      #     is_included_flag = 1
-      #     break
+      is_included_flag = 0
+      for word in target_words:
+        if word in embeddings:
+          is_included_flag = 1
+          break
           
 
-      # try:
-      #   target_index = target_word2idx[target]
-      # except:
-      #   print target
-      #   print "id not found for target"
-      #   exit()
+      try:
+        target_index = target_word2idx[target]
+      except:
+        print target
+        print "id not found for target"
+        exit()
 
 
-      # if not is_included_flag:
-      #   print sentence
-      #   continue
+      if not is_included_flag:
+        print sentence
+        continue
 
-      # sentence_list.append(id_tokenised_sentence)
-      # location_list.append(location_tokenised_sentence)
-      # target_list.append(target_index)
-      # polarity_list.append(polarity)
+      sentence_list.append(id_tokenised_sentence)
+      location_list.append(location_tokenised_sentence)
+      target_list.append(target_index)
+      polarity_list.append(polarity)
       original_sentence_list.append(original_sentence)
       DeltaI_mm_list.append(DI_mm)
       W_ma_list.append(W_ma)
 
-  return original_sentence_list, DeltaI_mm_list, W_ma_list
+  return sentence_list, location_list, target_list, polarity_list, original_sentence_list, DeltaI_mm_list, W_ma_list
+
