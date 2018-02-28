@@ -16,6 +16,7 @@ class MemN2N(object):
         self.nepoch = config.nepoch
         self.nhop = config.nhop
         self.edim = config.edim
+        self.LSTM_dim = config.LSTM_dim
         self.mem_size = config.mem_size
         self.lindim = config.lindim
         self.max_grad_norm = config.max_grad_norm
@@ -31,7 +32,7 @@ class MemN2N(object):
         self.neg_inf = tf.fill([self.batch_size, self.mem_size], -1*np.inf, name="neg_inf")
 
         self.delta_inv = tf.placeholder(tf.float32, [self.batch_size, self.mem_size, self.mem_size], name="delta_inv")
-        self.W_ma      = tf.placeholder(tf.float32, [self.batch_size, self.mem_size, 1], name="W_ma")
+        self.W_ma      = tf.placeholder(tf.float32, [self.batch_size, self.mem_size], name="W_ma")
 
         self.show = config.show
 
@@ -65,20 +66,36 @@ class MemN2N(object):
       self.ASPout2dim = tf.reshape(self.ASPin, [-1, self.edim])
       self.hid.append(self.ASPout2dim)    
 
-      lstm_in = self.Ain
+
+
+      self.LSTM_input = self.Ain #(batch_size , mem_size, e_dim)
+      cell = tf.nn.rnn_cell.LSTMCell(self.LSTM_dim, state_is_tuple=True)
+      outputs, state = tf.nn.dynamic_rnn(cell, /
+                                        self.LSTM_input, /
+                                        sequence_length=[10]*batch_size, /
+                                        dtype=tf.float32)
+
+
+
+      lstm_out = self.Ain
       lstm_dim = self.edim
 
-      self.Z  = tf.matmul(self.delta_inv, self.W_ma) #(batch_size * m * 1)
-      tf.reshape(self.Mi, [batch_size, -1])
+      self.W_ma3dim = tf.reshape(self.W_ma, [self.batch_size, self.mem_size, -1])
+      self.Z  = tf.matmul(self.delta_inv, self.W_ma3dim) #(batch_size * m * 1)
+      # tf.reshape(self.Mi, [batch_size, -1])
 
-      self.Mm = tf.transpose(lstm_in, perm=[0, 2, 1])
+      self.Mm = tf.transpose(lstm_out, perm=[0, 2, 1])
 
       self.Og = tf.matmul(self.Mm, self.Z)   #(batch_size * edim * 1)
+      self.Og2dim = tf.reshape(self.Og, [self.batch_size,-1])
+      # print "Og",self.Og2dim
 
       for h in xrange(self.nhop):
         '''
         Bi-linear scoring function for a context word and aspect term
         '''
+        # print h
+        # print "hid",self.hid[-1]
         self.til_hid = tf.tile(self.hid[-1], [1, self.mem_size])
         self.til_hid3dim = tf.reshape(self.til_hid, [-1, self.mem_size, self.edim])
         self.a_til_concat = tf.concat(axis=2, values=[self.til_hid3dim, self.Ain])
@@ -99,11 +116,12 @@ class MemN2N(object):
         self.Aout = tf.matmul(self.probs3dim, self.Ain)
         self.Aout2dim = tf.reshape(self.Aout, [self.batch_size, self.edim])
         
-        self.Aout2dim = tf.add(self.Aout2dim, self.Og)
+        self.Aout2dim = tf.add(self.Aout2dim, self.Og2dim)
 
         Cout = tf.matmul(self.hid[-1], self.C)
         til_C_B = tf.tile(self.C_B, [self.batch_size, 1])
         Cout_add = tf.add(Cout, til_C_B)
+
         self.Dout = tf.add(Cout_add, self.Aout2dim)
 
         if self.lindim == self.edim:
@@ -120,14 +138,18 @@ class MemN2N(object):
       self.build_memory()
 
       self.W = tf.Variable(tf.random_uniform([self.edim, 3], minval=-0.01, maxval=0.01))
-      self.z = tf.matmul(self.hid[-1], self.W)
+
+      self.dropped_out = tf.nn.dropout(self.hid[-1], 0.7) 
+      
+      self.z = tf.matmul(self.dropped_out, self.W)
       
       self.loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.z, labels=self.target)
 
       self.lr = tf.Variable(self.current_lr)
       self.opt = tf.train.AdagradOptimizer(self.lr)
 
-      params = [self.A, self.C, self.C_B, self.W, self.BL_W, self.BL_B]
+      # params = [self.A, self.C, self.C_B, self.W, self.BL_W, self.BL_B]
+      params = [self.C, self.C_B, self.W, self.BL_W, self.BL_B]
 
       self.loss = tf.reduce_sum(self.loss) 
 
@@ -144,7 +166,8 @@ class MemN2N(object):
       self.correct_prediction = tf.argmax(self.z, 1)
 
     def train(self, data):
-      source_data, source_loc_data, target_data, target_label= data
+      source_data, source_loc_data, target_data, target_label, orig_sent_data, delta_inv_data, W_ma_data= data
+      # print "W_ma_data", W_ma_data[0].shape
       N = int(math.ceil(len(source_data) / self.batch_size))
       cost = 0
 
@@ -153,7 +176,9 @@ class MemN2N(object):
       target = np.zeros([self.batch_size], dtype=np.int32) 
       context = np.ndarray([self.batch_size, self.mem_size], dtype=np.int32)
       mask = np.ndarray([self.batch_size, self.mem_size])
-      
+      delta_inv = np.ndarray([self.batch_size, self.mem_size, self.mem_size], dtype=np.float32)
+      W_ma = np.ndarray([self.batch_size, self.mem_size], dtype=np.float32)
+
       if self.show:
         from utils import ProgressBar
         bar = ProgressBar('Train', max=N)
@@ -177,6 +202,13 @@ class MemN2N(object):
             context[b,:len(source_data[m])] = source_data[m]
             #mask[b,:len(source_data[m])].fill(0)
             mask[b,:len(source_data[m])].fill(1)
+
+            crt_delta = delta_inv_data[m]
+            delta_inv[b] = np.pad(crt_delta, [(0,self.mem_size - len(crt_delta[0]))]*2, 'constant', constant_values = 0)
+            crt_wma = W_ma_data[m]
+            crt_wma = crt_wma.reshape(crt_wma.shape[0])
+            # print "crt_wma", crt_wma.shape
+            W_ma[b] = np.pad(crt_wma, [(0,self.mem_size - len(crt_wma))], 'constant', constant_values = 0)
             cur = cur + 1
  
         z, a, loss, self.step = self.sess.run([ self.z, self.optim,
@@ -187,7 +219,9 @@ class MemN2N(object):
                                                 self.time: time,
                                                 self.target: target,
                                                 self.context: context,
-                                                self.mask: mask})
+                                                self.mask: mask,
+                                                self.delta_inv: delta_inv,
+                                                self.W_ma: W_ma})
         
         
        
@@ -201,7 +235,7 @@ class MemN2N(object):
       return cost/N/self.batch_size, train_acc
 
     def test(self, data):
-      source_data, source_loc_data, target_data, target_label = data
+      source_data, source_loc_data, target_data, target_label, orig_sent_data, delta_inv_data, W_ma_data = data
       N = int(math.ceil(len(source_data) / self.batch_size))
       cost = 0
 
@@ -210,6 +244,9 @@ class MemN2N(object):
       target = np.zeros([self.batch_size], dtype=np.int32) 
       context = np.ndarray([self.batch_size, self.mem_size], dtype=np.int32)
       mask = np.ndarray([self.batch_size, self.mem_size])
+      delta_inv = np.ndarray([self.batch_size, self.mem_size, self.mem_size], dtype=np.float32)
+      W_ma = np.ndarray([self.batch_size, self.mem_size], dtype=np.float32)
+
 
       context.fill(self.pad_idx)
 
@@ -230,6 +267,13 @@ class MemN2N(object):
           #mask[b,:len(source_data[m])].fill(0)
           mask[b,:len(source_data[m])].fill(1)
           raw_labels.append(target_label[m])
+
+          crt_delta = delta_inv_data[m]
+          delta_inv[b] = np.pad(crt_delta, [(0,self.mem_size - len(crt_delta[0]))]*2, 'constant', constant_values = 0)
+          crt_wma = W_ma_data[m]
+          crt_wma = crt_wma.reshape(crt_wma.shape[0])
+          W_ma[b] = np.pad(crt_wma, [(0,self.mem_size - len(crt_wma))], 'constant', constant_values = 0)
+
           m += 1
 
         loss = self.sess.run([self.loss],
@@ -238,14 +282,18 @@ class MemN2N(object):
                                             self.time: time,
                                             self.target: target,
                                             self.context: context,
-                                            self.mask: mask})
+                                            self.mask: mask,
+                                            self.delta_inv: delta_inv,
+                                            self.W_ma: W_ma})
         cost += np.sum(loss)
 
         predictions = self.sess.run(self.correct_prediction, feed_dict={self.input: x,
                                                      self.time: time,
                                                      self.target: target,
                                                      self.context: context,
-                                                     self.mask: mask})
+                                                     self.mask: mask,
+                                                     self.delta_inv: delta_inv,
+                                                     self.W_ma: W_ma})
 
         for b in xrange(self.batch_size):
           if raw_labels[b] == predictions[b]:

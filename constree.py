@@ -9,7 +9,7 @@ class Constree:
 	def parseSentence(self,sentence):
 		# print sentence
 		parsing = self.nlp.parse(sentence)
-		# print parsing
+		print parsing
 		self.ptree = ParentedTree.fromstring(parsing)
 	def get_lca_length(self,location1, location2):
 		i = 0
@@ -58,6 +58,7 @@ class Constree:
 				adj[j][i] = adj[i][j]
 		diam = np.max(adj)
 		# print diam
+		print adj 
 		adj = adj/diam
 		adj = -adj*adj/(2*l*l)
 		adj = np.exp(adj)
@@ -69,7 +70,7 @@ class Constree:
 		leaf_values = self.ptree.leaves()
 		n = len(leaf_values)
 		sum_arr = np.apply_along_axis(np.sum,1,adj)
-		degMat = np.zeros((n,n))
+		degMat = np.zeros((n,n),dtype=np.float64)
 		for i in range(sum_arr.shape[0]):
 			degMat[i][i] = sum_arr[i]
 		return degMat
@@ -78,8 +79,10 @@ class Constree:
 		# print sentence
 		W = self.adjMatrix(sentence, l)
 		deg = self.degMatrix(adj=W)
-
 		D = deg - W
+		print W
+		print deg
+		print D
 		D_mm = np.delete(np.delete(D,aspect_words_indexes,0), aspect_words_indexes, 1)
 		DI_mm = np.linalg.inv(D_mm)
 		print W.shape, aspect_words_indexes

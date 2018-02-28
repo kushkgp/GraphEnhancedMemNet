@@ -48,6 +48,7 @@ def get_dataset_resources(data_file_name, sent_word2idx, target_word2idx, word_s
 
       sentence.replace("$T$", "")
       sentence = sentence.lower()
+      sentence = re.sub(r'[\?.]',' ',sentence)
       target = target.lower()
       max_sent_len = max(max_sent_len, len(sentence.split()))
       sentence_words.extend(sentence.split())
@@ -109,6 +110,7 @@ def get_embedding_matrix(embeddings, sent_word2idx,  target_word2idx, edim):
 #     for line_no in range(0, len(lines)-1, 3):
 #       print line_no
 #       sentence = lines[line_no].lower()
+#       sentence = re.sub(r'[\?.]',' ',sentence)
 #       target = lines[line_no+1].lower()
 #       polarity = int(lines[line_no+2])
 
@@ -123,7 +125,12 @@ def get_embedding_matrix(embeddings, sent_word2idx,  target_word2idx, edim):
 
 #       target_locations = range(target_location,target_location+len(target_words))
 #       original_sentence = sentence.replace("$t$", target)
-#       DI_mm, W_ma = Ctree.getReuiredParameters(sentence = original_sentence, aspect_words_indexes = target_locations)
+#       try:
+#         DI_mm, W_ma = Ctree.getReuiredParameters(sentence = original_sentence, aspect_words_indexes = target_locations)
+#         #
+#       except Exception as e:
+#         print e
+#         continue
 
 #       is_included_flag = 1
 #       id_tokenised_sentence = []
@@ -135,6 +142,7 @@ def get_embedding_matrix(embeddings, sent_word2idx,  target_word2idx, edim):
 #         try:
 #           word_index = sent_word2idx[word]
 #         except:
+#           print word
 #           print "id not found for word in the sentence"
 #           exit()
 
@@ -178,6 +186,9 @@ def get_embedding_matrix(embeddings, sent_word2idx,  target_word2idx, edim):
 #   return sentence_list, location_list, target_list, polarity_list, original_sentence_list, DeltaI_mm_list, W_ma_list
 
 
+
+
+
 def get_dataset(data_file_name, sent_word2idx, target_word2idx, embeddings):
   ''' returns the dataset'''
   sentence_list = []
@@ -196,7 +207,7 @@ def get_dataset(data_file_name, sent_word2idx, target_word2idx, embeddings):
     for line_no in range(0, len(lines)-1, 3):
       print line_no
       sentence = lines[line_no].lower()
-      sentence = re.sub(r'[\?.]','',sentence)
+      sentence = re.sub(r'[\?.]',' ',sentence)
       target = lines[line_no+1].lower()
       polarity = int(lines[line_no+2])
 
@@ -216,7 +227,10 @@ def get_dataset(data_file_name, sent_word2idx, target_word2idx, embeddings):
         #
       except Exception as e:
         print e
-        continue
+        # continue
+        return
+
+      continue
 
       is_included_flag = 1
       id_tokenised_sentence = []
@@ -228,6 +242,7 @@ def get_dataset(data_file_name, sent_word2idx, target_word2idx, embeddings):
         try:
           word_index = sent_word2idx[word]
         except:
+          print word
           print "id not found for word in the sentence"
           exit()
 
@@ -269,4 +284,5 @@ def get_dataset(data_file_name, sent_word2idx, target_word2idx, embeddings):
       W_ma_list.append(W_ma)
 
   return sentence_list, location_list, target_list, polarity_list, original_sentence_list, DeltaI_mm_list, W_ma_list
+
 
