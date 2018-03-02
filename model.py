@@ -53,32 +53,35 @@ class MemN2N(object):
 
       self.A = tf.Variable(tf.random_uniform([self.nwords, self.edim], minval=-0.01, maxval=0.01))
       self.ASP = tf.Variable(tf.random_uniform([self.pre_trained_target_wt.shape[0], self.edim], minval=-0.01, maxval=0.01))
-      self.C = tf.Variable(tf.random_uniform([self.edim, self.edim], minval=-0.01, maxval=0.01))
-      self.C_B =tf.Variable(tf.random_uniform([1, self.edim], minval=-0.01, maxval=0.01))
-      self.BL_W = tf.Variable(tf.random_uniform([2 * self.edim, 1], minval=-0.01, maxval=0.01))
-      self.BL_B = tf.Variable(tf.random_uniform([1, 1], minval=-0.01, maxval=0.01))
+      self.C = tf.Variable(tf.random_uniform([self.LSTM_dim, self.LSTM_dim], minval=-0.01, maxval=0.01))
+      # self.C_B =tf.Variable(tf.random_uniform([1, self.edim], minval=-0.01, maxval=0.01))
+      # self.BL_W = tf.Variable(tf.random_uniform([2 * self.LSTM_dim, 1], minval=-0.01, maxval=0.01))
+      # self.BL_B = tf.Variable(tf.random_uniform([1, 1], minval=-0.01, maxval=0.01))
+      self.C0 = tf.Variable(tf.random_uniform([self.edim, self.LSTM_dim], minval=-0.01, maxval=0.01))
 
 
-      self.Ain_c = tf.nn.embedding_lookup(self.A, self.context)
-      self.Ain = self.Ain_c
+      self.Ain_c = tf.nn.embedding_lookup(self.A, self.context) #batch_size * mem_size * edim
+      # self.Ain = self.Ain_c
 
-      self.ASPin = tf.nn.embedding_lookup(self.ASP, self.input)
-      self.ASPout2dim = tf.reshape(self.ASPin, [-1, self.edim])
-      self.hid.append(self.ASPout2dim)    
+      self.ASPin = tf.nn.embedding_lookup(self.ASP, self.input) #batch_size * 1 * edim
+      self.ASPout2dim = tf.reshape(self.ASPin, [-1, self.edim]) #batch_size * edim
+      self.TransfASPout2dim = tf.matmul(self.ASPout2dim, self.C0) #batch_size * LSTM_dim
+      self.hid.append(self.TransfASPout2dim)    #batch_size * LSTM_dim
 
 
 
-      self.LSTM_input = self.Ain #(batch_size , mem_size, e_dim)
+      self.LSTM_input = self.Ain_c #(batch_size , mem_size, e_dim)
       cell = tf.nn.rnn_cell.LSTMCell(self.LSTM_dim, state_is_tuple=True)
-      outputs, state = tf.nn.dynamic_rnn(cell, /
-                                        self.LSTM_input, /
-                                        sequence_length=[10]*batch_size, /
+      outputs, state = tf.nn.dynamic_rnn(cell, \
+                                        self.LSTM_input, \
+                                        sequence_length=[self.mem_size]*self.batch_size, \
                                         dtype=tf.float32)
 
 
 
-      lstm_out = self.Ain
-      lstm_dim = self.edim
+      lstm_out = outputs
+      self.Ain = outputs #batch_size * mem_size * lstm_dim
+      # lstm_dim = self.edim
 
       self.W_ma3dim = tf.reshape(self.W_ma, [self.batch_size, self.mem_size, -1])
       self.Z  = tf.matmul(self.delta_inv, self.W_ma3dim) #(batch_size * m * 1)
@@ -86,7 +89,7 @@ class MemN2N(object):
 
       self.Mm = tf.transpose(lstm_out, perm=[0, 2, 1])
 
-      self.Og = tf.matmul(self.Mm, self.Z)   #(batch_size * edim * 1)
+      self.Og = tf.matmul(self.Mm, self.Z)   #(batch_size * lstm_dim * 1)
       self.Og2dim = tf.reshape(self.Og, [self.batch_size,-1])
       # print "Og",self.Og2dim
 
@@ -96,33 +99,40 @@ class MemN2N(object):
         '''
         # print h
         # print "hid",self.hid[-1]
-        self.til_hid = tf.tile(self.hid[-1], [1, self.mem_size])
-        self.til_hid3dim = tf.reshape(self.til_hid, [-1, self.mem_size, self.edim])
-        self.a_til_concat = tf.concat(axis=2, values=[self.til_hid3dim, self.Ain])
-        self.til_bl_wt = tf.tile(self.BL_W, [self.batch_size, 1])
-        self.til_bl_3dim = tf.reshape(self.til_bl_wt, [self.batch_size,  2 * self.edim, -1])
-        self.att = tf.matmul(self.a_til_concat, self.til_bl_3dim)
-        self.til_bl_b = tf.tile(self.BL_B, [self.batch_size, self.mem_size])
-        self.til_bl_3dim = tf.reshape(self.til_bl_b, [-1, self.mem_size, 1])
-        self.g = tf.nn.tanh(tf.add(self.att, self.til_bl_3dim))
-        self.g_2dim = tf.reshape(self.g, [-1, self.mem_size])
-        #self.masked_g_2dim = tf.add(self.g_2dim, self.mask)
-        self.masked_g_2dim = tf.multiply(self.g_2dim, self.mask)
-        #self.P = tf.nn.softmax(self.masked_g_2dim)
-        self.P = self.masked_g_2dim
-        self.probs3dim = tf.reshape(self.P, [-1, 1, self.mem_size])
-
-
-        self.Aout = tf.matmul(self.probs3dim, self.Ain)
-        self.Aout2dim = tf.reshape(self.Aout, [self.batch_size, self.edim])
+        # self.til_hid = tf.tile(self.hid[-1], [1, self.mem_size]) #batch_size * LSTM_dim X mem_size X
+        # self.til_hid3dim = tf.reshape(self.til_hid, [-1, self.mem_size, self.LSTM_dim]) ##batch_size * mem_size * LSTM_dim
+        # self.a_til_concat = tf.concat(axis=2, values=[self.til_hid3dim, self.Ain]) #batch_size * mem_size * 2XLSTM_dim
+        # self.til_bl_wt = tf.tile(self.BL_W, [self.batch_size, 1]) #batch_size X 2 X LSTM_dim * 1
+        # self.til_bl_3dim = tf.reshape(self.til_bl_wt, [self.batch_size,  2 * self.LSTM_dim, -1]) #batch_size * 2 X LSTM_dim * 1
+        # self.att = tf.matmul(self.a_til_concat, self.til_bl_3dim) #batch_size * mem_size * 1
+        # self.til_bl_b = tf.tile(self.BL_B, [self.batch_size, self.mem_size]) #batch_size  *  mem_size
+        # self.til_bl_3dim = tf.reshape(self.til_bl_b, [-1, self.mem_size, 1]) #batch_size  *  mem_size * 1
+        # self.g = tf.nn.tanh(tf.add(self.att, self.til_bl_3dim)) #batch_size  *  mem_size * 1
+        # self.g_2dim = tf.reshape(self.g, [-1, self.mem_size]) #batch_size  *  mem_size
+        # #self.masked_g_2dim = tf.add(self.g_2dim, self.mask)
         
-        self.Aout2dim = tf.add(self.Aout2dim, self.Og2dim)
+        self.U3dim = tf.reshape(self.hid[-1], [-1, self.LSTM_dim, 1]) #bs * lstm_dim * 1
+        self.att3dim = tf.matmul(self.Ain, self.U3dim) #batch_size * mem_size * 1
+        self.att2dim = tf.reshape(self.att3dim, [-1, self.mem_size]) #batch_size * mem_size
+        self.g_2dim = tf.nn.tanh(self.att2dim) #batch_size * mem_size
 
-        Cout = tf.matmul(self.hid[-1], self.C)
-        til_C_B = tf.tile(self.C_B, [self.batch_size, 1])
-        Cout_add = tf.add(Cout, til_C_B)
+        self.masked_g_2dim = tf.multiply(self.g_2dim, self.mask) #batch_size  *  mem_size
+        #self.P = tf.nn.softmax(self.masked_g_2dim)
+        self.P = self.masked_g_2dim #batch_size  *  mem_size
+        self.probs3dim = tf.reshape(self.P, [-1, 1, self.mem_size]) #batch_size * 1  *  mem_size
 
-        self.Dout = tf.add(Cout_add, self.Aout2dim)
+
+        self.Aout = tf.matmul(self.probs3dim, self.Ain) #batch_size * 1 * lstm_dim
+        self.Aout2dim = tf.reshape(self.Aout, [self.batch_size, self.LSTM_dim]) #batch_size * lstm_dim
+        
+        self.Aout2dim = tf.add(self.Aout2dim, self.Og2dim) #batch_size * lstm_dim
+
+        Cout = tf.matmul(self.hid[-1], self.C) #batch_size * lstm_dim
+        # til_C_B = tf.tile(self.C_B, [self.batch_size, 1])
+        # Cout_add = tf.add(Cout, til_C_B)
+        # self.Dout = tf.add(Cout_add, self.Aout2dim)
+
+        self.Dout = tf.add(Cout, self.Aout2dim) #batch_size * lstm_dim
 
         if self.lindim == self.edim:
             self.hid.append(self.Dout)
@@ -137,7 +147,7 @@ class MemN2N(object):
     def build_model(self):
       self.build_memory()
 
-      self.W = tf.Variable(tf.random_uniform([self.edim, 3], minval=-0.01, maxval=0.01))
+      self.W = tf.Variable(tf.random_uniform([self.LSTM_dim, 3], minval=-0.01, maxval=0.01))
 
       self.dropped_out = tf.nn.dropout(self.hid[-1], 0.7) 
       
@@ -146,16 +156,17 @@ class MemN2N(object):
       self.loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.z, labels=self.target)
 
       self.lr = tf.Variable(self.current_lr)
-      self.opt = tf.train.AdagradOptimizer(self.lr)
+      self.opt = tf.train.AdamOptimizer(self.lr)
 
       # params = [self.A, self.C, self.C_B, self.W, self.BL_W, self.BL_B]
-      params = [self.C, self.C_B, self.W, self.BL_W, self.BL_B]
-
+      #params = [self.C0, self.C, self.W]
+      params = None
       self.loss = tf.reduce_sum(self.loss) 
 
       grads_and_vars = self.opt.compute_gradients(self.loss,params)
-      clipped_grads_and_vars = [(tf.clip_by_norm(gv[0], self.max_grad_norm), gv[1]) \
-                                for gv in grads_and_vars]
+      # clipped_grads_and_vars = [(tf.clip_by_norm(gv[0], self.max_grad_norm), gv[1]) \
+      #                           for gv in grads_and_vars]
+      clipped_grads_and_vars = grads_and_vars
 
       inc = self.global_step.assign_add(1)
       with tf.control_dependencies([inc]):

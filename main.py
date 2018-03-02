@@ -5,7 +5,7 @@ import pickle as pkl
 
 from nltk import word_tokenize
 from data import *
-# from model import MemN2N
+from model import MemN2N
 
 pp = pprint.PrettyPrinter()
 
@@ -33,20 +33,17 @@ def main(_):
   source_word2idx, target_word2idx, word_set = {}, {}, {}
   max_sent_len = -1
   
-  # max_sent_len = get_dataset_resources(FLAGS.train_data, source_word2idx, target_word2idx, word_set, max_sent_len)
-  # max_sent_len = get_dataset_resources(FLAGS.test_data, source_word2idx, target_word2idx, word_set, max_sent_len)
-  embeddings = 0
-  # embeddings = load_embedding_file(FLAGS.pretrain_file, word_set)
-
+  max_sent_len = get_dataset_resources(FLAGS.train_data, source_word2idx, target_word2idx, word_set, max_sent_len)
+  max_sent_len = get_dataset_resources(FLAGS.test_data, source_word2idx, target_word2idx, word_set, max_sent_len)
+  embeddings = load_embedding_file(FLAGS.pretrain_file, word_set)
   print "Embeddings Loaded"
-  train_data = get_dataset(FLAGS.train_data, source_word2idx, target_word2idx, embeddings)
-  return
-  # test_data = get_dataset(FLAGS.test_data, source_word2idx, target_word2idx, embeddings)
+  # train_data = get_dataset(FLAGS.train_data, source_word2idx, target_word2idx, embeddings)
+  test_data = get_dataset(FLAGS.test_data, source_word2idx, target_word2idx, embeddings)
   
-  # pkl.dump(train_data, open('train_data.pkl', 'w'))
-  # pkl.dump(test_data, open('test_data.pkl', 'w'))
-
-  # print "Dump Success!!!"
+  # pkl.dump(train_data, open('train_data_m.pkl', 'w'))
+  pkl.dump(test_data, open('test_data_m.pkl', 'w'))
+  print "Dump Success!!!"
+  return
  
   train_data = pkl.load(open('train_data.pkl', 'r'))
   test_data = pkl.load(open('test_data.pkl', 'r'))
@@ -66,10 +63,10 @@ def main(_):
   
   FLAGS.pre_trained_context_wt, FLAGS.pre_trained_target_wt = get_embedding_matrix(embeddings, source_word2idx,  target_word2idx, FLAGS.edim)
   
-  # with tf.Session() as sess:
-  #   model = MemN2N(FLAGS, sess)
-  #   model.build_model()
-  #   model.run(train_data, test_data)  
+  with tf.Session() as sess:
+    model = MemN2N(FLAGS, sess)
+    model.build_model()
+    model.run(train_data, test_data)  
 
 if __name__ == '__main__':
   tf.app.run()  

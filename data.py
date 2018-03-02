@@ -48,7 +48,7 @@ def get_dataset_resources(data_file_name, sent_word2idx, target_word2idx, word_s
 
       sentence.replace("$T$", "")
       sentence = sentence.lower()
-      sentence = re.sub(r'[\?.]',' ',sentence)
+      sentence = re.sub(r'[\?.!]',';',sentence)
       target = target.lower()
       max_sent_len = max(max_sent_len, len(sentence.split()))
       sentence_words.extend(sentence.split())
@@ -90,6 +90,103 @@ def get_embedding_matrix(embeddings, sent_word2idx,  target_word2idx, edim):
 
   print type(word_embed_matrix)
   return word_embed_matrix, target_embed_matrix
+
+
+def get_dataset(data_file_name, sent_word2idx, target_word2idx, embeddings):
+  ''' returns the dataset'''
+  sentence_list = []
+  location_list = []
+  target_list = []
+  polarity_list = []
+
+  original_sentence_list = []
+  DeltaI_mm_list = []
+  W_ma_list = []
+
+
+  with open(data_file_name, 'r') as data_file:
+    Ctree = constree.Constree()
+    lines = data_file.read().split('\n')
+    for line_no in range(0, len(lines)-1, 3):
+      print line_no
+      sentence = lines[line_no].lower()
+      sentence = re.sub(r'[\?.!]',';',sentence)
+      target = lines[line_no+1].lower()
+      polarity = int(lines[line_no+2])
+
+
+      sent_words = sentence.split()
+      target_words = target.split()
+      try:
+        target_location = sent_words.index("$t$")
+      except:
+        print "sentence does not contain target element tag"
+        exit()
+
+      target_locations = range(target_location,target_location+len(target_words))
+      original_sentence = sentence.replace("$t$", target)
+      try:
+        DI_mm, W_ma = Ctree.getReuiredParameters(sentence = original_sentence, aspect_words_indexes = target_locations)
+        #
+      except Exception as e:
+        print e
+        continue
+
+      is_included_flag = 1
+      id_tokenised_sentence = []
+      location_tokenised_sentence = []
+      
+      for index, word in enumerate(sent_words):
+        if word == "$t$":
+          continue
+        try:
+          word_index = sent_word2idx[word]
+        except:
+          print word
+          print "id not found for word in the sentence"
+          exit()
+
+        location_info = abs(index - target_location)
+
+        if word in embeddings:
+          id_tokenised_sentence.append(word_index)
+          location_tokenised_sentence.append(location_info)
+
+        # if word not in embeddings:
+        #   is_included_flag = 0
+        #   break
+
+      is_included_flag = 0
+      for word in target_words:
+        if word in embeddings:
+          is_included_flag = 1
+          break
+          
+
+      try:
+        target_index = target_word2idx[target]
+      except:
+        print target
+        print "id not found for target"
+        exit()
+
+
+      if not is_included_flag:
+        print sentence
+        continue
+
+      sentence_list.append(id_tokenised_sentence)
+      location_list.append(location_tokenised_sentence)
+      target_list.append(target_index)
+      polarity_list.append(polarity)
+      original_sentence_list.append(original_sentence)
+      DeltaI_mm_list.append(DI_mm)
+      W_ma_list.append(W_ma)
+
+  return sentence_list, location_list, target_list, polarity_list, original_sentence_list, DeltaI_mm_list, W_ma_list
+
+
+
 
 
 # def get_dataset(data_file_name, sent_word2idx, target_word2idx, embeddings):
@@ -184,105 +281,5 @@ def get_embedding_matrix(embeddings, sent_word2idx,  target_word2idx, edim):
 #       W_ma_list.append(W_ma)
 
 #   return sentence_list, location_list, target_list, polarity_list, original_sentence_list, DeltaI_mm_list, W_ma_list
-
-
-
-
-
-def get_dataset(data_file_name, sent_word2idx, target_word2idx, embeddings):
-  ''' returns the dataset'''
-  sentence_list = []
-  location_list = []
-  target_list = []
-  polarity_list = []
-
-  original_sentence_list = []
-  DeltaI_mm_list = []
-  W_ma_list = []
-
-
-  with open(data_file_name, 'r') as data_file:
-    Ctree = constree.Constree()
-    lines = data_file.read().split('\n')
-    for line_no in range(0, len(lines)-1, 3):
-      print line_no
-      sentence = lines[line_no].lower()
-      sentence = re.sub(r'[\?.]',' ',sentence)
-      target = lines[line_no+1].lower()
-      polarity = int(lines[line_no+2])
-
-
-      sent_words = sentence.split()
-      target_words = target.split()
-      try:
-        target_location = sent_words.index("$t$")
-      except:
-        print "sentence does not contain target element tag"
-        exit()
-
-      target_locations = range(target_location,target_location+len(target_words))
-      original_sentence = sentence.replace("$t$", target)
-      try:
-        DI_mm, W_ma = Ctree.getReuiredParameters(sentence = original_sentence, aspect_words_indexes = target_locations)
-        #
-      except Exception as e:
-        print e
-        # continue
-        return
-
-      continue
-
-      is_included_flag = 1
-      id_tokenised_sentence = []
-      location_tokenised_sentence = []
-      
-      for index, word in enumerate(sent_words):
-        if word == "$t$":
-          continue
-        try:
-          word_index = sent_word2idx[word]
-        except:
-          print word
-          print "id not found for word in the sentence"
-          exit()
-
-        location_info = abs(index - target_location)
-
-        if word in embeddings:
-          id_tokenised_sentence.append(word_index)
-          location_tokenised_sentence.append(location_info)
-
-        # if word not in embeddings:
-        #   is_included_flag = 0
-        #   break
-
-      is_included_flag = 0
-      for word in target_words:
-        if word in embeddings:
-          is_included_flag = 1
-          break
-          
-
-      try:
-        target_index = target_word2idx[target]
-      except:
-        print target
-        print "id not found for target"
-        exit()
-
-
-      if not is_included_flag:
-        print sentence
-        continue
-
-      sentence_list.append(id_tokenised_sentence)
-      location_list.append(location_tokenised_sentence)
-      target_list.append(target_index)
-      polarity_list.append(polarity)
-      original_sentence_list.append(original_sentence)
-      DeltaI_mm_list.append(DI_mm)
-      W_ma_list.append(W_ma)
-
-  return sentence_list, location_list, target_list, polarity_list, original_sentence_list, DeltaI_mm_list, W_ma_list
 
 

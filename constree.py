@@ -9,7 +9,7 @@ class Constree:
 	def parseSentence(self,sentence):
 		# print sentence
 		parsing = self.nlp.parse(sentence)
-		print parsing
+		# print parsing
 		self.ptree = ParentedTree.fromstring(parsing)
 	def get_lca_length(self,location1, location2):
 		i = 0
@@ -57,13 +57,14 @@ class Constree:
 				adj[i][j] = self.findPathLen(i,j)
 				adj[j][i] = adj[i][j]
 		diam = np.max(adj)
-		# print diam
-		print adj 
+		print diam
+		# print adj 
 		adj = adj/diam
 		adj = -adj*adj/(2*l*l)
 		adj = np.exp(adj)
 		self.adj = adj
 		return adj
+
 	def degMatrix(self, sentence=None, l=0.1, adj = None):
 		if adj is None:
 			adj = self.adjMatrix(sentence,l)
@@ -74,22 +75,21 @@ class Constree:
 		for i in range(sum_arr.shape[0]):
 			degMat[i][i] = sum_arr[i]
 		return degMat
+
 	def getReuiredParameters(self, sentence, aspect_words_indexes, l=0.1):
 		'''Returns DeltaInverse_mm and Wights_ma'''
 		# print sentence
 		W = self.adjMatrix(sentence, l)
 		deg = self.degMatrix(adj=W)
 		D = deg - W
-		print W
-		print deg
-		print D
-		D_mm = np.delete(np.delete(D,aspect_words_indexes,0), aspect_words_indexes, 1)
-		DI_mm = np.linalg.inv(D_mm)
-		print W.shape, aspect_words_indexes
+		DI = np.linalg.inv(D)
+		DI_mm = np.delete(np.delete(DI,aspect_words_indexes,0), aspect_words_indexes, 1)
+		# D_mm = np.delete(np.delete(D,aspect_words_indexes,0), aspect_words_indexes, 1)
+		# D_mm_I = np.linalg.inv(D_mm)
 		W_am = np.delete(W[aspect_words_indexes], aspect_words_indexes, 1)
 		W_m1 = np.transpose([np.mean(W_am,0)])
+		# return D_mm_I, W_m1
 		return DI_mm, W_m1
-
 def main():
 	c = Constree()
 	sentence = 'i saw a dog today.'
