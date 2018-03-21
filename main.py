@@ -14,16 +14,18 @@ flags = tf.app.flags
 flags.DEFINE_integer("edim", 300, "internal state dimension [300]")
 flags.DEFINE_integer("LSTM_dim", 128, "output dimension of LSTM [128]")
 flags.DEFINE_integer("lindim", 300, "linear part of the state [75]")
-flags.DEFINE_integer("nhop", 3, "number of hops [7]")
-flags.DEFINE_integer("batch_size", 16, "batch size to use during training [128]")
-flags.DEFINE_integer("nepoch", 20, "number of epoch to use during training [100]")
+flags.DEFINE_integer("nhop", 1, "number of hops [7]")
+flags.DEFINE_integer("batch_size", 1 , "batch size to use during training [128]")
+flags.DEFINE_integer("nepoch", 30, "number of epoch to use during training [100]")
 flags.DEFINE_float("init_lr", 0.05, "initial learning rate [0.01]")
 flags.DEFINE_float("init_hid", 0.1, "initial internal state value [0.1]")
 flags.DEFINE_float("init_std", 0.01, "weight initialization std [0.05]")
 flags.DEFINE_float("max_grad_norm", 100, "clip gradients to this norm [50]")
-flags.DEFINE_string("pretrain_file", "/media/storage/BTP/my_work/emb/glove.42B.300d.txt", "pre-trained glove vectors file path [../data/glove.6B.300d.txt]")
+flags.DEFINE_string("pretrain_file", "/Users/yash/Documents/Acads/BTP/2017/Sentiment_Flow/ABSA/Memory_Networks/data/glove.840B.300d.txt", "pre-trained glove vectors file path [../data/glove.6B.300d.txt]")
 flags.DEFINE_string("train_data", "data/Laptops_Train.xml.seg", "train gold data set path [./data/Laptops_Train.xml.seg]")
 flags.DEFINE_string("test_data", "data/Laptops_Test_Gold.xml.seg", "test gold data set path [./data/Laptops_Test_Gold.xml.seg]")
+# flags.DEFINE_string("train_data", "data/Restaurants_Train_v2.xml.seg", "train gold data set path [./data/Laptops_Train.xml.seg]")
+# flags.DEFINE_string("test_data", "data/Restaurants_Test_Gold.xml.seg", "test gold data set path [./data/Laptops_Test_Gold.xml.seg]")
 flags.DEFINE_boolean("show", False, "print progress [False]")
 
 FLAGS = flags.FLAGS
@@ -35,18 +37,20 @@ def main(_):
   
   max_sent_len = get_dataset_resources(FLAGS.train_data, source_word2idx, target_word2idx, word_set, max_sent_len)
   max_sent_len = get_dataset_resources(FLAGS.test_data, source_word2idx, target_word2idx, word_set, max_sent_len)
-  embeddings = load_embedding_file(FLAGS.pretrain_file, word_set)
+  # embeddings = load_embedding_file(FLAGS.pretrain_file, word_set)
   print "Embeddings Loaded"
   # train_data = get_dataset(FLAGS.train_data, source_word2idx, target_word2idx, embeddings)
-  test_data = get_dataset(FLAGS.test_data, source_word2idx, target_word2idx, embeddings)
+  # test_data = get_dataset(FLAGS.test_data, source_word2idx, target_word2idx, embeddings)
   
-  # pkl.dump(train_data, open('train_data_m.pkl', 'w'))
-  pkl.dump(test_data, open('test_data_m.pkl', 'w'))
-  print "Dump Success!!!"
-  return
- 
-  train_data = pkl.load(open('train_data.pkl', 'r'))
-  test_data = pkl.load(open('test_data.pkl', 'r'))
+  # pkl.dump(train_data, open('train_data.pkl', 'w'))
+  # pkl.dump(test_data, open('test_data.pkl', 'w'))
+  #print "Dump Success!!!"
+  #return
+  train_data, test_data, FLAGS.pre_trained_context_wt, FLAGS.pre_trained_target_wt, max_sent_len = pkl.load(open('Laptops_mmfirst/TOTAL_data_laptop_mmfirst.pkl','r'))
+  # train_data = pkl.load(open('train_data.pkl', 'r'))
+  # test_data = pkl.load(open('test_data.pkl', 'r'))
+
+  #return source_word2idx, target_word2idx, train_data, test_data
 
   print "train data size - ", len(train_data[0])
   print "test data size - ", len(test_data[0])
@@ -61,8 +65,9 @@ def main(_):
   print('loading pre-trained word vectors...')
   print('loading pre-trained word vectors for train and test data')
   
-  FLAGS.pre_trained_context_wt, FLAGS.pre_trained_target_wt = get_embedding_matrix(embeddings, source_word2idx,  target_word2idx, FLAGS.edim)
+  # FLAGS.pre_trained_context_wt, FLAGS.pre_trained_target_wt = get_embedding_matrix(embeddings, source_word2idx,  target_word2idx, FLAGS.edim)
   
+  print FLAGS.pre_trained_context_wt.shape, FLAGS.pre_trained_target_wt.shape
   with tf.Session() as sess:
     model = MemN2N(FLAGS, sess)
     model.build_model()
