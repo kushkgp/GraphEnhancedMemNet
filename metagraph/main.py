@@ -38,16 +38,30 @@ def main(_):
   
   max_sent_len = get_dataset_resources(FLAGS.train_data, source_word2idx, target_word2idx, word_set, max_sent_len)
   max_sent_len = get_dataset_resources(FLAGS.test_data, source_word2idx, target_word2idx, word_set, max_sent_len)
-  # embeddings = load_embedding_file(FLAGS.pretrain_file, word_set)
-  # print "Embeddings Loaded"
-
-  # train_data = get_dataset(FLAGS.train_data, source_word2idx, target_word2idx, embeddings)
-  # test_data = get_dataset(FLAGS.test_data, source_word2idx, target_word2idx, embeddings)
   
-  # pkl.dump(train_data, open('train_data_restaurant.pkl', 'w'))
-  # pkl.dump(test_data, open('test_data_restaurant.pkl', 'w'))
-  # print "Dump Success!!!"
-  # return
+  embeddings = load_embedding_file(FLAGS.pretrain_file, word_set)
+  print "Embeddings Loaded"
+
+'''
+  #uncomment for the first run
+  #required for generating data in the pickle format
+
+
+  train_data = get_dataset(FLAGS.train_data, source_word2idx, target_word2idx, embeddings)
+  test_data = get_dataset(FLAGS.test_data, source_word2idx, target_word2idx, embeddings)
+  
+  pkl.dump(train_data, open('train_data_restaurant.pkl', 'w'))
+  pkl.dump(test_data, open('test_data_restaurant.pkl', 'w'))
+
+  # pkl.dump(train_data, open('train_data_laptop.pkl', 'w'))
+  # pkl.dump(test_data, open('test_data_laptop.pkl', 'w'))
+  
+  print "Dump Success!!!"
+  
+  return
+'''
+
+  #Loading the the data generated
 
   # train_data = pkl.load(open('train_data_laptop.pkl', 'r'))
   # train_data = pkl.load(open('train_data_extra.pkl', 'r'))
@@ -56,10 +70,15 @@ def main(_):
   # test_data = pkl.load(open('test_data_laptop.pkl', 'r'))
   # test_data = pkl.load(open('test_data_extra.pkl', 'r'))
   test_data = pkl.load(open('test_data_restaurant_clean.pkl', 'r'))
+  print "Dump Loaded!!!"
+
+''' 
+  #uncomment for Rul + Con 
+  #Concatenates the Wma from the consTree to the Wrm for (Rul + con) method, 
+  #Requires that the data in both in indexed-wise matched already
 
   # GraphMemNetData = pkl.load(open('TOTAL_LAT_const_laptop.pkl','r'))
   GraphMemNetData = pkl.load(open('TOTAL_data_restaurant_clean.pkl','r'))
-  print "Dump Loaded!!!"
 
   Wma_train = GraphMemNetData[0][6]
   Wma_test = GraphMemNetData[1][6]
@@ -73,7 +92,7 @@ def main(_):
   for index, wma in enumerate(Wma_test):
     wam = np.reshape(wma,(1,-1))
     Wrm[index] = np.concatenate((Wrm[index], wam),axis=0)
-
+'''
   
 
   print "train data size - ", len(train_data[0])
@@ -89,8 +108,9 @@ def main(_):
   print('loading pre-trained word vectors...')
   print('loading pre-trained word vectors for train and test data')
   
-  # FLAGS.pre_trained_context_wt, FLAGS.pre_trained_target_wt = get_embedding_matrix(embeddings, source_word2idx,  target_word2idx, FLAGS.edim)
-  FLAGS.pre_trained_context_wt, FLAGS.pre_trained_target_wt = GraphMemNetData[2], GraphMemNetData[3]
+  FLAGS.pre_trained_context_wt, FLAGS.pre_trained_target_wt = get_embedding_matrix(embeddings, source_word2idx,  target_word2idx, FLAGS.edim)
+  
+  # FLAGS.pre_trained_context_wt, FLAGS.pre_trained_target_wt = GraphMemNetData[2], GraphMemNetData[3] 
   
   with tf.Session() as sess:
     model = MemN2N(FLAGS, sess)
