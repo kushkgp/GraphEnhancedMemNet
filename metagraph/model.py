@@ -8,7 +8,7 @@ from past.builtins import xrange
 import time as tim
 
 class MemN2N(object):
-    def __init__(self, config, sess):
+    def __init__(self, config, sess, pre_trained_context_wt, pre_trained_target_wt):
         self.nwords = config.nwords
         self.batch_size = config.batch_size
         self.nepoch = config.nepoch
@@ -19,12 +19,15 @@ class MemN2N(object):
         self.mem_size = config.mem_size
         self.max_grad_norm = config.max_grad_norm
         self.pad_idx = config.pad_idx
-        self.pre_trained_context_wt = config.pre_trained_context_wt
-        self.pre_trained_target_wt = config.pre_trained_target_wt
+        self.pre_trained_context_wt = pre_trained_context_wt
+        self.pre_trained_target_wt = pre_trained_target_wt
+        print pre_trained_target_wt.shape
         self.input = tf.placeholder(tf.int32, [self.batch_size, 1], name="input")
         self.time = tf.placeholder(tf.int32, [None, self.mem_size], name="time")
         self.target = tf.placeholder(tf.int64, [self.batch_size], name="target")
         self.context = tf.placeholder(tf.int32, [self.batch_size, self.mem_size], name="context")
+        self.LSTM_inp_dout = tf.placeholder(tf.float32, name="LSTM_inp_dout")
+        self.LSTM_out_dout = tf.placeholder(tf.float32, name="LSTM_out_dout")
         # self.mask = tf.placeholder(tf.float32, [self.batch_size, self.mem_size], name="mask")
         self.A = tf.placeholder(tf.float32, [self.nwords, self.edim], name="A") # Vocab * edim
         self.ASP = tf.placeholder(tf.float32, [self.pre_trained_target_wt.shape[0], self.edim], name="ASP") # V2 * edim
@@ -51,9 +54,9 @@ class MemN2N(object):
 
       self.Ain_c = tf.nn.embedding_lookup(self.A, self.context) #batch_size * mem_size * edim
 
-
       self.LSTM_input = self.Ain_c #(batch_size , mem_size, e_dim)
       cell = tf.nn.rnn_cell.LSTMCell(self.LSTM_dim, state_is_tuple=True)
+      cell = tf.nn.rnn_cell.DropoutWrapper(cell, input_keep_prob=self.LSTM_inp_dout,  state_keep_prob = self.LSTM_out_dout)
       outputs, state = tf.nn.dynamic_rnn(cell, \
                                         self.LSTM_input, \
                                         sequence_length=[self.mem_size]*self.batch_size, \
@@ -162,6 +165,8 @@ class MemN2N(object):
                                                 # self.mask: mask,
                                                 self.W_rm: W_rm,
                                                 self.A:self.pre_trained_context_wt,
+                                                self.LSTM_inp_dout:0.5,
+                                                self.LSTM_out_dout:0.7,
                                                 self.ASP:self.pre_trained_target_wt})
         
        
@@ -232,7 +237,7 @@ class MemN2N(object):
 
           m += 1
 
-        loss = self.sess.run([self.loss],
+        loss, predictions = self.sess.run([self.loss, self.correct_prediction],
                                         feed_dict={
                                             self.input: x,
                                             self.time: time,
@@ -240,16 +245,10 @@ class MemN2N(object):
                                             self.context: context,
                                             self.W_rm: W_rm,
                                             self.A:self.pre_trained_context_wt,
+                                            self.LSTM_inp_dout:1.0,
+                                            self.LSTM_out_dout:1.0,
                                             self.ASP:self.pre_trained_target_wt})
         cost += np.sum(loss)
-
-        predictions = self.sess.run(self.correct_prediction, feed_dict={self.input: x,
-                                                     self.time: time,
-                                                     self.target: target,
-                                                     self.context: context,
-                                                     self.W_rm: W_rm,
-                                                     self.A:self.pre_trained_context_wt,
-                                                     self.ASP:self.pre_trained_target_wt})
 
         for b in xrange(self.batch_size):
           if raw_labels[b] == predictions[b]:

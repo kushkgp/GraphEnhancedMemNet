@@ -9,8 +9,9 @@ import html
 import HTMLParser
 import re
 
+import constree
 stop = set(stopwords.words('english')) #- set('no')
-
+Ctree = constree.Constree()
 # def _get_abs_pos(cur, ids):
 #   min_dist = 1000
 #   for i in ids:
@@ -176,10 +177,12 @@ def get_dataset(data_file_name, sent_word2idx, target_word2idx, embeddings):
   with open(data_file_name, 'r') as data_file:
     lines = data_file.read().split('\n')
     for line_no in range(0, len(lines)-1, 3):
+      print line_no
       sentence = lines[line_no].lower()
       target = lines[line_no+1].lower()
       polarity = int(lines[line_no+2])
 
+      sentence = re.sub(r'[\?.!]', ';', sentence)
       sent_words = sentence.split()
       target_words = target.split()
       try:
@@ -210,6 +213,7 @@ def get_dataset(data_file_name, sent_word2idx, target_word2idx, embeddings):
         try:
           word_index = sent_word2idx[word]
         except:
+          print word
           print "id not found for word in the sentence"
           exit()
 

@@ -6,25 +6,25 @@ import numpy as np
 class Constree:
 	def __init__(self):
 		self.nlp = snlp(r'./resources/stanford-corenlp-full-2018-01-31')
+
 	def parseSentence(self,sentence):
-		# print sentence
 		parsing = self.nlp.parse(sentence)
-		# print parsing
 		self.ptree = ParentedTree.fromstring(parsing)
+
 	def get_lca_length(self,location1, location2):
 		i = 0
 		while i < len(location1) and i < len(location2) and location1[i] == location2[i]:
 			i+=1
 		return i
+
 	def get_labels_from_lca(self, lca_len, location):
 		labels = []
 		for i in range(lca_len, len(location)):
 			labels.append(self.ptree[location[:i]].label())
 		return labels
+
 	def findPathLen(self, index1, index2):
-		# leaf_values = self.ptree.leaves()
-		# leaf_index1 = leaf_values.index(text1)
-		# leaf_index2 = leaf_values.index(text2)
+		'''Returns the pathlen of between two words given their positions in the sentence '''
 		leaf_index1 = index1
 		leaf_index2 = index2
 
@@ -46,8 +46,9 @@ class Constree:
 		if len(result)==0:
 			return 0
 		return len(result) + 1
-		# return result
+
 	def adjMatrix(self,sentence,l=0.1):
+		'''Returns the adjacency matrix using path len as the distance between two nodes'''
 		self.parseSentence(sentence)
 		leaf_values = self.ptree.leaves()
 		n = len(leaf_values)
@@ -57,8 +58,6 @@ class Constree:
 				adj[i][j] = self.findPathLen(i,j)
 				adj[j][i] = adj[i][j]
 		diam = np.max(adj)
-		print diam
-		# print adj 
 		adj = adj/diam
 		adj = -adj*adj/(2*l*l)
 		adj = np.exp(adj)
@@ -66,6 +65,7 @@ class Constree:
 		return adj
 
 	def degMatrix(self, sentence=None, l=0.1, adj = None):
+		'''Returns the degree matrix'''
 		if adj is None:
 			adj = self.adjMatrix(sentence,l)
 		leaf_values = self.ptree.leaves()
@@ -78,18 +78,18 @@ class Constree:
 
 	def getReuiredParameters(self, sentence, aspect_words_indexes, l=0.1):
 		'''Returns DeltaInverse_mm and Wights_ma'''
-		# print sentence
 		W = self.adjMatrix(sentence, l)
+		
 		deg = self.degMatrix(adj=W)
 		D = deg - W
 		DI = np.linalg.inv(D)
 		DI_mm = np.delete(np.delete(DI,aspect_words_indexes,0), aspect_words_indexes, 1)
-		# D_mm = np.delete(np.delete(D,aspect_words_indexes,0), aspect_words_indexes, 1)
-		# D_mm_I = np.linalg.inv(D_mm)
+		
 		W_am = np.delete(W[aspect_words_indexes], aspect_words_indexes, 1)
 		W_m1 = np.transpose([np.mean(W_am,0)])
-		# return D_mm_I, W_m1
-		return DI_mm, W_m1
+		W_mm = np.delete(np.delete(W,aspect_words_indexes,0), aspect_words_indexes, 1)
+		return W_mm, W_m1
+
 def main():
 	c = Constree()
 	sentence = 'i saw a dog today.'
