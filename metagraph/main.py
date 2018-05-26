@@ -12,6 +12,8 @@ pp = pprint.PrettyPrinter()
 
 flags = tf.app.flags
 
+
+flags.DEFINE_string("saved_model_directory", "./saved_models/cond", "path to directory containing saved models")
 flags.DEFINE_integer("edim", 300, "internal state dimension [300]")
 flags.DEFINE_integer("LSTM_dim", 128, "output dimension of LSTM [128]")
 flags.DEFINE_integer("lindim", 300, "linear part of the state [75]")
@@ -160,6 +162,14 @@ def main(_):
 	with tf.Session() as sess:
 		model = MemN2N(FLAGS, sess, pre_trained_context_wt, pre_trained_target_wt)
 		model.build_model()
+
+		# Restoring model from saved model if present to resume training
+		saver = tf.train.Saver(tf.trainable_variables())
+		ckpt = tf.train.get_checkpoint_state(FLAGS.cond_saved_model_directory)
+		if ckpt:
+			saver.restore(sess, ckpt.model_checkpoint_path)
+			print ckpt.model_checkpoint_path, "Pre-trained model loaded"
+
 		model.run(train_data, test_data, test_data1, test_data2)	
 
 if __name__ == '__main__':

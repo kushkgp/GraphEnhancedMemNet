@@ -9,6 +9,8 @@ import time as tim
 
 class MemN2N(object):
     def __init__(self, config, sess, pre_trained_context_wt, pre_trained_target_wt):
+
+        self.saved_model_directory = config.saved_model_directory
         self.nwords = config.nwords
         self.batch_size = config.batch_size
         self.nepoch = config.nepoch
@@ -338,10 +340,16 @@ class MemN2N(object):
       # self.sess.run(self.A.assign(self.pre_trained_context_wt))
       # self.sess.run(self.ASP.assign(self.pre_trained_target_wt))
 
+      best_loss = np.inf
       for idx in xrange(self.nepoch):
         print('epoch '+str(idx)+'...')
         train_loss, train_acc = self.train(train_data)
         test_loss, test_acc = self.test(test_data)
+
+        if test_loss < best_loss:
+          best_loss = total_loss_per_epoch
+          saver.save(self.sess, self.saved_model_directory + "/saved_model", global_step=epoch)
+
         print('train-loss=%.4f;train-acc=%.4f;test-acc-overall=%.4f;' % (train_loss, train_acc, test_acc))
         test_loss, test_acc = self.test(test_data1)
         print('train-loss=%.4f;train-acc=%.4f;test-acc-withRul=%.4f;' % (train_loss, train_acc, test_acc))
