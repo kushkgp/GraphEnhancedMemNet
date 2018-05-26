@@ -93,6 +93,7 @@ class MemN2N(object):
       self.Fout2dim = tf.reshape(self.Fout3dim, [self.batch_size, -1]) #batch_size * lstm_dim
       self.Og2dim = self.Fout2dim
 
+      self.this_needs_to_be_dumped = None
       for h in xrange(self.nhop):
         '''
         Bi-linear scoring function for a context word and aspect term
@@ -112,6 +113,9 @@ class MemN2N(object):
         self.Aout = tf.matmul(self.probs3dim, self.Ain) #batch_size * 1 * lstm_dim
         self.Aout2dim = tf.reshape(self.Aout, [self.batch_size, self.LSTM_dim]) #batch_size * lstm_dim
         
+        if h == 0:
+          self.this_needs_to_be_dumped = self.P
+
         self.Fout2dim = tf.add(self.Og2dim, tf.matmul(self.Aout2dim, self.GW)) #batch_size * lstm_dim
 
         # Uncomment the following lines for using only Graph Based, Only Semantic Based or other combinations
@@ -271,6 +275,12 @@ class MemN2N(object):
 
       context.fill(self.pad_idx)
 
+      #dump material
+      dump_sem_att = []
+      dump_alpha = None
+      dump_prediction = []
+      dump_label = []
+
       m, acc = 0, 0
       for i in xrange(N):
         target.fill(0)
@@ -294,6 +304,26 @@ class MemN2N(object):
 
           m += 1
 
+        #Uncomment for dump previllage
+        # sem_att, alpha, loss, predictions = self.sess.run([self.this_needs_to_be_dumped, self.Att, self.loss, self.correct_prediction],
+        #                                 feed_dict={
+        #                                     self.input: x,
+        #                                     self.time: time,
+        #                                     self.target: target,
+        #                                     self.context: context,
+        #                                     self.mask: mask,
+        #                                     self.W_rm: W_rm,
+        #                                     self.A:self.pre_trained_context_wt,
+        #                                     self.LSTM_inp_dout:1.0,
+        #                                     self.LSTM_out_dout:1.0,
+        #                                     self.Final_dout:1.0,
+        #                                     self.ASP:self.pre_trained_target_wt})
+
+        # dump_sem_att += sem_att
+        # dump_alpha = alpha
+        # dump_prediction += predictions
+        # dump_label += target
+
         loss, predictions = self.sess.run([self.loss, self.correct_prediction],
                                         feed_dict={
                                             self.input: x,
@@ -313,9 +343,16 @@ class MemN2N(object):
           if raw_labels[b] == predictions[b]:
             acc = acc + 1
 
+      #Uncomment for dump previllage
+      # return dump_sem_att, dump_alpha, dump_prediction, dump_label
+      
       print 'predictions - ', predictions
       print 'labels - ', raw_labels
       return cost, acc/float(len(source_data))
+
+
+
+
 
     # def run(self, train_data, test_data):
     #   print('training...')
@@ -341,6 +378,12 @@ class MemN2N(object):
       # self.sess.run(self.ASP.assign(self.pre_trained_target_wt))
 
       best_loss = np.inf
+
+      #Uncomment for dump previllage
+      # dump_train = self.test(train_data)
+      # dump_test =  self.test(test_data)
+      # return dump_train, dump_test
+
       for idx in xrange(self.nepoch):
         print('epoch '+str(idx)+'...')
         train_loss, train_acc = self.train(train_data)
